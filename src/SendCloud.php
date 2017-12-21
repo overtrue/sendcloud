@@ -62,7 +62,7 @@ class SendCloud extends Client
             return function (RequestInterface $request, array $options) use ($handler) {
                 $credential = http_build_query([
                     'apiUser' => $this->apiUser,
-                    'apiKey' => $this->apiKey,
+                    'apiKey'  => $this->apiKey,
                 ]);
 
                 if ('post' == $request->getMethod()) {
