@@ -1,6 +1,6 @@
 <h1 align="center">SendCloud</h1>
 
-<p align="center">:e-mail: SendCloud Mail SDK</p>
+<p align="center">:e-mail: [SendCloud](https://www.sendcloud.net) Mail SDK</p>
 
 ## Installing
 
