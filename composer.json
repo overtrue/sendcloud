@@ -16,11 +16,5 @@
     "minimum-stability":"dev",
     "require": {
         "overtrue/http": "dev-master"
-    },
-    "repositories": {
-        "g": {
-            "type": "path",
-            "url": "../http"
-        }
     }
 }
