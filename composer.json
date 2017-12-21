@@ -1,0 +1,26 @@
+{
+    "name": "overtrue/sendcloud",
+    "description": "SendCloud SDK",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "overtrue",
+            "email": "anzhengchao@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Overtrue\\SendCloud\\": "src"
+        }
+    },
+    "minimum-stability":"dev",
+    "require": {
+        "overtrue/http": "dev-master"
+    },
+    "repositories": {
+        "g": {
+            "type": "path",
+            "url": "../http"
+        }
+    }
+}
