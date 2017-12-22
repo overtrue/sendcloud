@@ -13,8 +13,7 @@
             "Overtrue\\SendCloud\\": "src"
         }
     },
-    "minimum-stability":"dev",
     "require": {
-        "overtrue/http": "dev-master"
+        "overtrue/http": "^1.0"
     }
 }
