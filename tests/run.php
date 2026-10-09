@@ -124,6 +124,7 @@ addTest('form credentials replaced without losing duplicate values', function ()
     $c->request('mail/send', 'post', ['body' => 'x=1&x=2&api%55ser=wrong&apiKey=wrong', 'headers' => ['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8']]);
     $r = $history[0]['request'];
     check(0 === strpos((string) $r->getBody(), 'x=1&x=2&'), 'Duplicate form values lost');
+    same('application/x-www-form-urlencoded; charset=UTF-8', $r->getHeaderLine('Content-Type'));
     auth(form($r));
     same(1, substr_count((string) $r->getBody(), 'apiUser='));
     lengthMatches($r);

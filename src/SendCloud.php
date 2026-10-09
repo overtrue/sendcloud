@@ -92,7 +92,10 @@ class SendCloud extends Client
                     $stream = new Stream(fopen('php://temp', 'r+'));
                     $stream->write($this->withCredentials((string) $body, $credentials));
                     $stream->rewind();
-                    $request = $request->withBody($stream)->withHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    $request = $request->withBody($stream);
+                    if ('' === $contentType) {
+                        $request = $request->withHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    }
                     $request = $this->withBodyLength($request);
                 } else {
                     // Leave non-form bodies untouched, preserving unrelated query parameters.
