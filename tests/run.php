@@ -68,7 +68,16 @@ function lengthMatches($request)
 }
 
 $tests = [];
-$tests['HTTPS, documented path and POST body authentication'] = function () {
+function addTest($name, Closure $test)
+{
+    global $tests;
+    if (array_key_exists($name, $tests)) {
+        throw new RuntimeException('Duplicate test name: '.$name);
+    }
+    $tests[$name] = $test;
+}
+
+addTest('HTTPS, documented path and POST body authentication', function () {
     $c = client($history);
     same(['result' => true], $c->post('/mail/send?trace=one', ['subject' => '你好 +&= 100%', 'html' => '<b>hello</b>']));
     $r = $history[0]['request'];
@@ -79,20 +88,20 @@ $tests['HTTPS, documented path and POST body authentication'] = function () {
     same('<b>hello</b>', form($r)['html']);
     same('application/x-www-form-urlencoded', $r->getHeaderLine('Content-Type'));
     lengthMatches($r);
-};
-$tests['relative paths and custom base URI'] = function () {
+});
+addTest('relative paths and custom base URI', function () {
     $c = client($history, ['base_uri' => 'https://example.test/custom/']);
     $c->post('mail/send', []);
     same('https://example.test/custom/mail/send', (string) $history[0]['request']->getUri());
     auth(form($history[0]['request']));
-};
-$tests['absolute URLs retain Guzzle resolution'] = function () {
+});
+addTest('absolute URLs retain Guzzle resolution', function () {
     $c = client($history);
     $c->get('https://example.test/exact?x=1');
     same('example.test', $history[0]['request']->getUri()->getHost());
     same('/exact', $history[0]['request']->getUri()->getPath());
-};
-$tests['GET preserves repeated and encoded parameters'] = function () {
+});
+addTest('GET preserves repeated and encoded parameters', function () {
     $c = client($history);
     $c->get('/label/list?x=1&x=2&value=a%2Bb%20c&apiUser=wrong&apiKey=wrong');
     $q = $history[0]['request']->getUri()->getQuery();
@@ -101,16 +110,16 @@ $tests['GET preserves repeated and encoded parameters'] = function () {
     auth($query);
     same(1, substr_count($q, 'apiUser='));
     same(1, substr_count($q, 'apiKey='));
-};
-$tests['Guzzle query option retains data'] = function () {
+});
+addTest('Guzzle query option retains data', function () {
     $c = client($history);
     $c->get('label/list', ['query' => ['labelId' => 42, 'name' => '测试 +']]);
     parse_str($history[0]['request']->getUri()->getQuery(), $query);
     auth($query);
     same('42', $query['labelId']);
     same('测试 +', $query['name']);
-};
-$tests['form credentials replaced without losing duplicate values'] = function () {
+});
+addTest('form credentials replaced without losing duplicate values', function () {
     $c = client($history);
     $c->request('mail/send', 'post', ['body' => 'x=1&x=2&api%55ser=wrong&apiKey=wrong', 'headers' => ['Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8']]);
     $r = $history[0]['request'];
@@ -118,14 +127,14 @@ $tests['form credentials replaced without losing duplicate values'] = function (
     auth(form($r));
     same(1, substr_count((string) $r->getBody(), 'apiUser='));
     lengthMatches($r);
-};
-$tests['empty POST becomes authenticated form'] = function () {
+});
+addTest('empty POST becomes authenticated form', function () {
     $c = client($history);
     $c->requestRaw('mail/send', 'POST');
     auth(form($history[0]['request']));
     same('', $history[0]['request']->getUri()->getQuery());
-};
-$tests['multipart attachment and credentials use one valid boundary'] = function () {
+});
+addTest('multipart attachment and credentials use one valid boundary', function () {
     $c = client($history);
     $file = fopen('php://temp', 'r+');
     fwrite($file, "binary\0attachment\r\n你好");
@@ -144,8 +153,8 @@ $tests['multipart attachment and credentials use one valid boundary'] = function
     same('trace=1', $r->getUri()->getQuery());
     lengthMatches($r);
     fclose($file);
-};
-$tests['JSON remains unchanged, authentication preserves query'] = function () {
+});
+addTest('JSON remains unchanged, authentication preserves query', function () {
     $c = client($history);
     $c->request('custom?trace=1', 'POST', ['json' => ['value' => '你好']]);
     $r = $history[0]['request'];
@@ -153,8 +162,8 @@ $tests['JSON remains unchanged, authentication preserves query'] = function () {
     parse_str($r->getUri()->getQuery(), $q);
     auth($q);
     same('1', $q['trace']);
-};
-$tests['repeated calls never accumulate authentication or lose payload'] = function () {
+});
+addTest('repeated calls never accumulate authentication or lose payload', function () {
     $c = client($history, [], [new Response(200, [], '{}'), new Response(200, [], '{}')]);
     for ($i = 0; $i < 2; ++$i) {
         $c->post('/mail/send', ['subject' => 'repeat']);
@@ -164,9 +173,9 @@ $tests['repeated calls never accumulate authentication or lose payload'] = funct
         same(1, substr_count((string) $r->getBody(), 'apiKey='));
     }
     same((string) $history[0]['request']->getBody(), (string) $history[1]['request']->getBody());
-};
+});
 foreach (['array', 'object', 'collection', 'raw'] as $type) {
-    $tests['response type '.$type.' remains unchanged'] = function () use ($type) {
+    addTest('response type '.$type.' remains unchanged', function () use ($type) {
         $c = client($history, ['response_type' => $type]);
         $result = $c->post('mail/send');
         if ('array' === $type) {
@@ -180,14 +189,14 @@ foreach (['array', 'object', 'collection', 'raw'] as $type) {
             check($result instanceof ResponseInterface, 'Not a raw response');
             same('{"result":true}', (string) $result->getBody());
         }
-    };
+    });
 }
-$tests['API-level failure stays a response'] = function () {
+addTest('API-level failure stays a response', function () {
     $payload = ['result' => false, 'statusCode' => 40001, 'message' => 'synthetic failure'];
     $c = client($history, [], [new Response(200, [], json_encode($payload))]);
     same($payload, $c->post('mail/send'));
-};
-$tests['HTTP failure propagates'] = function () {
+});
+addTest('HTTP failure propagates', function () {
     $c = client($history, [], [new Response(400, [], '{"result":false}')]);
     try {
         $c->post('mail/send');
@@ -196,12 +205,12 @@ $tests['HTTP failure propagates'] = function () {
         return;
     }
     throw new RuntimeException('Expected ClientException');
-};
-$tests['http_errors option remains configurable'] = function () {
+});
+addTest('http_errors option remains configurable', function () {
     $c = client($history, [], [new Response(400, [], '{"result":false}')]);
     same(['result' => false], $c->post('mail/send', [], ['http_errors' => false]));
-};
-$tests['transport errors propagate'] = function () {
+});
+addTest('transport errors propagate', function () {
     $error = new ConnectException('synthetic connection failure', new Request('POST', 'https://example.test/'));
     $c = client($history, [], [$error]);
     try {
@@ -211,23 +220,23 @@ $tests['transport errors propagate'] = function () {
         return;
     }
     throw new RuntimeException('Expected ConnectException');
-};
-$tests['async POST returns promise and authenticates'] = function () {
+});
+addTest('async POST returns promise and authenticates', function () {
     $c = client($history);
     $promise = $c->postAsync('/mail/send', ['subject' => 'async']);
     check($promise instanceof PromiseInterface, 'Not a promise');
     same(['result' => true], $promise->wait());
     auth(form($history[0]['request']));
-};
-$tests['async GET and raw response'] = function () {
+});
+addTest('async GET and raw response', function () {
     $c = client($history, ['response_type' => 'raw']);
     $result = $c->getAsync('/label/list?labelId=1')->wait();
     check($result instanceof ResponseInterface, 'Not a raw response');
     parse_str($history[0]['request']->getUri()->getQuery(), $q);
     auth($q);
     same('1', $q['labelId']);
-};
-$tests['async HTTP errors reject'] = function () {
+});
+addTest('async HTTP errors reject', function () {
     $c = client($history, [], [new Response(400)]);
     try {
         $c->postAsync('mail/send')->wait();
@@ -236,9 +245,9 @@ $tests['async HTTP errors reject'] = function () {
         return;
     }
     throw new RuntimeException('Expected async rejection');
-};
+});
 
-$tests['async multipart preserves form and file bytes'] = function () {
+addTest('async multipart preserves form and file bytes', function () {
     $c = client($history);
     $file = fopen('php://temp', 'r+');
     fwrite($file, 'async attachment');
@@ -250,8 +259,8 @@ $tests['async multipart preserves form and file bytes'] = function () {
     same('', $r->getUri()->getQuery());
     lengthMatches($r);
     fclose($file);
-};
-$tests['partially read form streams retain the full encoded body'] = function () {
+});
+addTest('partially read form streams retain the full encoded body', function () {
     $c = client($history);
     $stream = new GuzzleHttp\Psr7\Stream(fopen('php://temp', 'r+'));
     $stream->write('subject=hello&x=1');
@@ -263,7 +272,113 @@ $tests['partially read form streams retain the full encoded body'] = function ()
     same('hello', form($r)['subject']);
     same('1', form($r)['x']);
     lengthMatches($r);
-};
+});
+
+foreach ([302, 307, 308] as $code) {
+    foreach (['get', 'post', 'multipart'] as $mode) {
+        addTest('redirects disabled '.$code.' '.$mode, function () use ($code, $mode) {
+            $c = client($history, ['response_type' => 'raw'], [new Response($code, ['Location' => 'https://other.example.test/stolen'])]);
+            if ('get' === $mode) {
+                $response = $c->get('label/list?private=value');
+            } elseif ('post' === $mode) {
+                $response = $c->post('mail/send', ['subject' => 'private payload']);
+            } else {
+                $response = $c->request('mail/send', 'POST', ['multipart' => [['name' => 'attachment', 'contents' => 'private bytes']]]);
+            }
+            same($code, $response->getStatusCode());
+            same(1, count($history));
+        });
+        foreach (['https://other.example.test/stolen', 'http://api.sendcloud.net/stolen', 'https://api.sendcloud.net:444/stolen', '//other.example.test/stolen'] as $target) {
+            addTest('unsafe redirect '.$code.' '.$mode.' '.$target, function () use ($code, $mode, $target) {
+                $callbackCalls = 0;
+                $c = client($history, ['allow_redirects' => ['on_redirect' => function () use (&$callbackCalls) { ++$callbackCalls; }]], [new Response($code, ['Location' => $target]), new Response(200, [], '{}')]);
+                try {
+                    if ('get' === $mode) {
+                        $c->get('label/list?private=value');
+                    } elseif ('post' === $mode) {
+                        $c->post('mail/send', ['subject' => 'private payload']);
+                    } else {
+                        $c->request('mail/send', 'POST', ['multipart' => [['name' => 'attachment', 'contents' => 'private bytes']]]);
+                    }
+                } catch (GuzzleHttp\Exception\RequestException $e) {
+                    same(1, count($history));
+                    same(0, $callbackCalls);
+                    same($code, $e->getResponse()->getStatusCode());
+                    return;
+                }
+                throw new RuntimeException('Unsafe redirect was followed');
+            });
+        }
+    }
+}
+addTest('async unsafe redirect rejects before second transport', function () {
+    $c = client($history, [], [new Response(307, ['Location' => 'https://other.example.test/stolen']), new Response(200, [], '{}')]);
+    try {
+        $c->postAsync('mail/send', ['subject' => 'private'], ['allow_redirects' => true])->wait();
+    } catch (GuzzleHttp\Exception\RequestException $e) {
+        same(1, count($history));
+        return;
+    }
+    throw new RuntimeException('Expected rejected redirect promise');
+});
+addTest('custom origin same-origin redirect preserves multipart and callback', function () {
+    $calls = 0;
+    $c = client($history, ['base_uri' => 'https://example.test/custom/', 'allow_redirects' => ['on_redirect' => function () use (&$calls) { ++$calls; }]], [new Response(307, ['Location' => 'https://example.test:443/next']), new Response(200, [], '{"result":true}')]);
+    same(['result' => true], $c->request('mail/send', 'POST', ['multipart' => [['name' => 'attachment', 'contents' => 'private bytes']]]));
+    same(2, count($history));
+    same(1, $calls);
+    foreach ($history as $transaction) {
+        $r = $transaction['request'];
+        same('example.test', $r->getUri()->getHost());
+        same('POST', $r->getMethod());
+        check(false !== strpos((string) $r->getBody(), 'private bytes'), 'Multipart bytes lost on redirect');
+        same(1, substr_count((string) $r->getBody(), 'name="apiKey"'));
+        lengthMatches($r);
+    }
+});
+addTest('custom origin cannot redirect to the default API origin', function () {
+    $c = client($history, ['base_uri' => 'https://example.test/custom/', 'allow_redirects' => true], [new Response(302, ['Location' => SendCloud::BASE_URI]), new Response(200, [], '{}')]);
+    try {
+        $c->get('label/list');
+    } catch (GuzzleHttp\Exception\RequestException $e) {
+        same(1, count($history));
+        return;
+    }
+    throw new RuntimeException('Custom-origin boundary not enforced');
+});
+addTest('direct HTTP client retains the redirect guard', function () {
+    $c = client($history, [], [new Response(302, ['Location' => 'https://other.example.test/stolen']), new Response(200, [], '{}')]);
+    try {
+        $c->getHttpClient()->request('GET', 'label/list', ['allow_redirects' => true]);
+    } catch (GuzzleHttp\Exception\RequestException $e) {
+        same(1, count($history));
+        return;
+    }
+    throw new RuntimeException('Direct client bypassed redirect guard');
+});
+
+foreach (['request', 'raw-client'] as $entry) {
+    addTest('reject ambiguous prebuilt multipart '.$entry, function () use ($entry) {
+        $c = client($history);
+        $body = new GuzzleHttp\Psr7\MultipartStream([['name' => 'apiKey', 'contents' => 'wrong'], ['name' => 'subject', 'contents' => 'private']]);
+        try {
+            if ('request' === $entry) {
+                $c->request('mail/send', 'POST', ['body' => $body]);
+            } else {
+                $c->getHttpClient()->request('POST', 'mail/send', ['body' => $body]);
+            }
+        } catch (InvalidArgumentException $e) {
+            same(0, count($history));
+            check(false !== strpos($e->getMessage(), 'multipart request option'), 'Missing migration guidance');
+            return;
+        }
+        throw new RuntimeException('Ambiguous multipart body was sent');
+    });
+}
+
+if (!$tests) {
+    throw new RuntimeException('No regression tests registered.');
+}
 
 $failures = 0;
 foreach ($tests as $name => $test) {

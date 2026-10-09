@@ -13,6 +13,13 @@
   API base path, matching the documented `/mail/send` usage. Callers that need an
   origin-root path must supply an absolute URL.
 
+- Redirect following is disabled by default. Explicitly enabled redirects must
+  remain on the initial scheme, host, and port; cross-origin/downgrade redirects
+  throw before a second request is sent.
+
+- Prebuilt multipart bodies and low-level HTTP-client multipart calls are rejected;
+  use the SDK `upload()` or `request()` multipart option instead.
+
 ### Fixed
 
 - Use HTTPS by default and honor an explicitly configured base URI.
@@ -26,4 +33,4 @@
 ### Tests
 
 - Add mocked outgoing-request regressions, syntax checks, dependency audits, and
-  lowest/latest dependency CI for PHP 7.2, 7.4, 8.2, 8.4, and 8.5.
+  lowest/latest dependency CI for PHP 7.2–7.4 and 8.0–8.5.

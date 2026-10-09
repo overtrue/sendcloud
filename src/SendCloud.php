@@ -10,6 +10,8 @@
 
 namespace Overtrue\SendCloud;
 
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\AppendStream;
 use GuzzleHttp\Psr7\LimitStream;
 use GuzzleHttp\Psr7\MultipartStream;
@@ -17,6 +19,8 @@ use GuzzleHttp\Psr7\Stream;
 use Overtrue\Http\Client;
 use Overtrue\Http\Config;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * Class SendCloud.
@@ -49,7 +53,7 @@ class SendCloud extends Client
         $this->apiUser = $apiUser;
         $this->apiKey = $apiKey;
 
-        $config += ['base_uri' => self::BASE_URI];
+        $config += ['base_uri' => self::BASE_URI, 'allow_redirects' => false];
 
         parent::__construct(new Config($config));
 
@@ -67,10 +71,13 @@ class SendCloud extends Client
                     'apiUser' => $this->apiUser,
                     'apiKey' => $this->apiKey,
                 ];
-                $contentType = strtolower(explode(';', $request->getHeaderLine('Content-Type'))[0]);
+                $contentType = strtolower(trim(explode(';', $request->getHeaderLine('Content-Type'))[0]));
                 $body = $request->getBody();
 
                 if ('POST' === strtoupper($request->getMethod()) && $body instanceof MultipartStream) {
+                    if (empty($options['sendcloud_multipart'])) {
+                        throw new \InvalidArgumentException('Use SendCloud::upload() or its multipart request option instead of a prebuilt multipart body.');
+                    }
                     $parts = [];
                     foreach ($credentials as $name => $contents) {
                         $parts[] = compact('name', 'contents');
@@ -100,6 +107,44 @@ class SendCloud extends Client
     }
 
     /**
+     * Guard redirects before Guzzle follows them or authentication is added again.
+     */
+    public function getHandlerStack(): HandlerStack
+    {
+        $needsGuard = null === $this->handlerStack;
+        $stack = parent::getHandlerStack();
+
+        if ($needsGuard) {
+            $stack->before('allow_redirects', function (callable $handler) {
+                return function (RequestInterface $request, array $options) use ($handler) {
+                    $redirects = $options['allow_redirects'] ?? false;
+                    if (true === $redirects || (is_array($redirects) && $redirects)) {
+                        $redirects = true === $redirects ? [] : $redirects;
+                        $callback = $redirects['on_redirect'] ?? null;
+                        $origin = $request->getUri();
+                        $redirects['on_redirect'] = function (RequestInterface $request, ResponseInterface $response, UriInterface $target) use ($origin, $callback) {
+                            if ($origin->getScheme() !== $target->getScheme()
+                                || $origin->getHost() !== $target->getHost()
+                                || $origin->getPort() !== $target->getPort()
+                                || $origin->getUserInfo() !== $target->getUserInfo()) {
+                                throw new RequestException('SendCloud redirects must stay on the original origin.', $request, $response);
+                            }
+                            if (null !== $callback) {
+                                $callback($request, $response, $target);
+                            }
+                        };
+                        $options['allow_redirects'] = $redirects;
+                    }
+
+                    return $handler($request, $options);
+                };
+            }, 'sendcloud_redirect_guard');
+        }
+
+        return $stack;
+    }
+
+    /**
      * Treat API endpoint paths with a leading slash like their relative form.
      */
     public function requestRaw(string $uri, string $method = 'GET', array $options = [], bool $async = false)
@@ -108,7 +153,9 @@ class SendCloud extends Client
             $uri = ltrim($uri, '/');
         }
 
+        unset($options['sendcloud_multipart']);
         if ('POST' === strtoupper($method) && isset($options['multipart'])) {
+            $options['sendcloud_multipart'] = true;
             $options['multipart'] = array_values(array_filter($options['multipart'], function ($part) {
                 return !isset($part['name']) || !in_array($part['name'], ['apiUser', 'apiKey'], true);
             }));

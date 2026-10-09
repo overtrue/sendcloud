@@ -18,12 +18,14 @@ $apiKey = 'UWoBGa2sgxyxxxxxxxx';
 
 $client = new SendCloud($apiUser, $apiKey);
 
-$result = $client->post('mail/send', [
+$message = [
     'from' => 'overtrue@domain.sendcloud.org',
     'to' => 'demo@easywechat.com',
     'subject' => '来自 SendCloud 的第一封邮件！',
     'html' => '你太棒了！你已成功的 从 SendCloud 发送了一封测试邮件！',
-]);
+];
+
+$result = $client->post('mail/send', $message);
 
 var_dump($result);
 
@@ -49,7 +51,14 @@ The PHP minimum and Guzzle 7 requirement are breaking changes from version 1.
 Requests use `https://api.sendcloud.net/apiv2/` by default. Endpoint paths such
 as `mail/send` and `/mail/send` are resolved under this base path. An explicitly
 configured `base_uri` is honored; include its trailing slash. Absolute URLs
-retain Guzzle's normal behavior. Only use trusted endpoints with your API keys.
+retain Guzzle's normal behavior. Only use trusted endpoints with your API keys. Prefer HTTPS for every configured
+or absolute endpoint; an explicitly supplied HTTP URL is not upgraded.
+
+Redirects are disabled by default. If you explicitly set `allow_redirects` to
+`true` or a Guzzle redirect-options array, redirects must retain the original
+scheme, host, and port. Cross-origin redirects and HTTPS-to-HTTP downgrades throw
+a request exception before credentials or payloads can be forwarded. Existing
+`on_redirect` callbacks are called only after this check passes.
 
 ```php
 $client = new SendCloud($apiUser, $apiKey, [
@@ -60,7 +69,10 @@ $client = new SendCloud($apiUser, $apiKey, [
 
 POST form requests carry authentication in the form body. Use `upload()` for
 attachments; authentication is added as multipart fields without URL-encoding
-those field values. GET authentication is added to the query without removing
+those field values. You can also pass the `multipart` option to the SDK's
+`request()` method. Prebuilt multipart bodies and low-level HTTP-client multipart
+calls are rejected; use these SDK entry points so caller-supplied authentication
+fields can be replaced before encoding. GET authentication is added to the query without removing
 other parameters. Non-form request bodies are left unchanged and authentication
 is added to their query. Response types and exception behavior remain those of
 `overtrue/http`; API-level failures are not converted into exceptions.
